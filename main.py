@@ -12,34 +12,13 @@ damerau_levenshtein = textdistance.DamerauLevenshtein(external=True)
 # tempo = int(audio.info.length)
 # print(artist, titulo, tempo)
 
-playlist = './Just Dance Unlimited - Todas as Músicas!.m3u'
-
-with open(playlist, 'r') as file:
-    linhas = file.readlines()
-
-def ler_m3u(linhas):
-    musicas = []
-    for line in linhas:
-        if line.startswith('#EXTINF:'):
-            tmp = line.split(",")
-            time = int(tmp[0].split(":")[1])  # 194208
-            if time > 100000:
-                time = int(time/1000)
-            url_decodificada = urllib.parse.unquote(tmp[1]).split("-")
-            artist = url_decodificada[0].replace(
-                " ", "").replace('\n', "").lower()
-            url_decodificada.pop(0)
-            titulo = ''.join(url_decodificada).replace(
-                " ", "").replace('\n', "").lower()
-            musicas.append((titulo, artist, time))
-    return musicas
-
+raiz = '/storage/emulated/0/Music/Sync/'
+playlist = './Favoritos.m3u'
 
 def similar(s1, s2):
     result = damerau_levenshtein.normalized_similarity(s1, s2)
     # print(result,s1)
     return result
-
 
 def encontrar_musica(diretorio, titulo_procurado, artist_procurado, tempo_procurado):
     for raiz, dirs, arquivos in os.walk(diretorio):
@@ -68,22 +47,32 @@ def encontrar_musica(diretorio, titulo_procurado, artist_procurado, tempo_procur
 
                     return (urllib.parse.quote(caminho_completo), urllib.parse.quote(caminho_completo.replace(diretorio, "")), urllib.parse.quote(arquivo))
                     # return caminho_completo.replace(diretorio, "")
-
     return None
 
+with open(playlist, 'r') as file:
+    linhas = file.readlines()
 
-musicas = ler_m3u(linhas)
-print(musicas)
-raiz = '/storage/emulated/0/Music/Sync/'
+    for i,line in enumerate(linhas):
+        if line.startswith('#EXTINF:'):
+            tmp = line.split(",")
+            time = int(tmp[0].split(":")[1])
+            if time > 100000:# problema com unidade de media de tempo
+                time = int(time/1000)
+            url_decodificada = urllib.parse.unquote(tmp[1]).split("-")
+            artist = url_decodificada[0].replace(
+                " ", "").replace('\n', "").lower()
+            url_decodificada.pop(0)
+            titulo = ''.join(url_decodificada).replace(" ", "").replace('\n', "").lower()
+            
+            result = encontrar_musica('/home/jadson/Músicas/sync/',titulo, artist, time)
+            if result:
+                # Adicionando novos caminhos
+                linhas[i] = linhas[i]+urllib.parse.quote(raiz+result[1])+'\n'+'\n'.join(result)+'\n'
 
-for i, musica in enumerate(musicas):
-    result = encontrar_musica('/home/jadson/Músicas/sync/',
-                              musica[0], musica[1], musica[2])
-    if result:
-        # Substitui a linha desejada
-        linhas[1+(i*2+1)] = urllib.parse.quote(raiz+result[1])+'\n'+'\n'.join(result)+'\n'
-        # linhas[1+(i*2+1)] = raiz+result+'\n'
+# Separe a extensão do arquivo
+nome_base, extensao = os.path.splitext(playlist)
 
-# Escreve as linhas de volta no arquivo
-with open('playlist.m3u', 'w') as file:
+novo_nome_arquivo = nome_base + '_s' + extensao
+
+with open(novo_nome_arquivo, 'w') as file:
     file.writelines(linhas)
