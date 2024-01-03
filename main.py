@@ -53,7 +53,7 @@ def read_audio_metadata(file_path):
             elif ext in ['.m4a', '.mp4']:
                 audio = MP4(file_path)
             else:
-                return "Formato de arquivo não suportado."
+                return False
             
             title = audio.get('title', ['Desconhecido'])[0]
             artist = audio.get('artist', ['Desconhecido'])[0]
@@ -96,19 +96,19 @@ def find_music(directory, title_search, artist_search, duration_search):
                 try:
                     path = os.path.join(root, file)
                     metadata = read_audio_metadata(path)
+                    if metadata:
+                        duration_similarity = 1 / (1 + abs(duration_search - metadata['duration']))
 
-                    duration_similarity = 1 / (1 + abs(duration_search - metadata['duration']))
+                        title = clean_string(metadata['title'])
+                        title_similarity = normalized_similarity(title, title_search)
 
-                    title = clean_string(metadata['title'])
-                    title_similarity = normalized_similarity(title, title_search)
+                        artist = clean_string(metadata['artist'])
+                        artist_similarity = normalized_similarity(artist, artist_search)
 
-                    artist = clean_string(metadata['artist'])
-                    artist_similarity = normalized_similarity(artist, artist_search)
+                        average_similarity = (title_similarity + artist_similarity + duration_similarity) / 3
 
-                    average_similarity = (title_similarity + artist_similarity + duration_similarity) / 3
-
-                    if average_similarity > 0.8:
-                        return path
+                        if average_similarity > 0.8:
+                            return path
                 except Exception as e:
                     print(f"Error processing file {file}: {e}")
 
@@ -131,7 +131,7 @@ def update_playlist(playlist_path, music_directory, output_directory):
         print(f"Error opening playlist: {e}")
         return
 
-    for i, line in tqdm(enumerate(lines)):
+    for i, line in tqdm(enumerate(lines), total=len(lines)):
         if line.startswith('#EXTINF:'):
             parsed_line = parse_playlist_line(line)
             if parsed_line:
@@ -152,6 +152,6 @@ def update_playlist(playlist_path, music_directory, output_directory):
 # Example Usage
 music_directory = '/home/jadson/Músicas/sync/'
 output_directory = '/storage/emulated/0/Music/Sync/'
-playlist_path = './Favoritos.m3u'
+playlist_path = './no pain, no gain .m3u'
 
 update_playlist(playlist_path, music_directory, output_directory)
