@@ -22,7 +22,7 @@ from mutagen.mp4 import MP4
 
 def normalized_similarity(s1, s2):
     """Calculate normalized similarity between two strings."""
-    return textdistance.DamerauLevenshtein(external=True).normalized_similarity(s1, s2)
+    return textdistance.JaroWinkler(external=True).normalized_similarity(s1, s2)
 
 def clean_string(s):
     """Remove spaces, line breaks, and convert to lowercase."""
@@ -86,33 +86,50 @@ def parse_playlist_line(line):
         print("Error parsing line:", line)
         return None
 
-def find_music(directory, title_search, artist_search, duration_search):
-    """Find music file in the directory that matches the given criteria."""
-    for root, _, files in os.walk(directory):
-        for file in files:
-            # Obtém o tipo MIME do arquivo
-            mime_type, _ = mimetypes.guess_type(file)
-            if mime_type.startswith('audio'):
-                try:
-                    path = os.path.join(root, file)
-                    metadata = read_audio_metadata(path)
-                    if metadata:
-                        duration_similarity = 1 / (1 + abs(duration_search - metadata['duration']))
+def list_music(directory):
+    print("Listando as músicas neste diretório:", directory)
+    total_files = sum(len(files) for _, _, files in os.walk(directory))
+    with tqdm(total=total_files) as pbar:
+        musicas = []
+        for root, _, files in os.walk(directory):
+            pbar.update(1)
+            for file in files:
+                # Obtém o tipo MIME do arquivo
+                mime_type, _ = mimetypes.guess_type(file)
+                if mime_type.startswith('audio'):
+                    try:
+                        path = os.path.join(root, file)
+                        metadata = read_audio_metadata(path)
+                        if metadata:
+                            metadata['title'] = clean_string(metadata['title'])
+                            metadata['artist'] = clean_string(
+                                metadata['artist'])
+                            metadata['path'] = path
+                            musicas.append(metadata)
 
-                        title = clean_string(metadata['title'])
-                        title_similarity = normalized_similarity(title, title_search)
+                    except Exception as e:
+                        print(f"Error processing file {file}: {e}")
+        pbar.close()
+        return musicas
+    
+def find_music(musicas,title_search, artist_search, duration_search):
+    similarity_max = 0
+    path = None
+    for musica in musicas:
+        duration_similarity = 1 / (1 + abs(duration_search - musica['duration']))
+        title_similarity = normalized_similarity(title_search, musica['title'])
+        artist_similarity = normalized_similarity(artist_search, musica['artist'])
+        average_similarity = (title_similarity*2 +
+                            artist_similarity*2 + duration_similarity) / (2+2+1)
 
-                        artist = clean_string(metadata['artist'])
-                        artist_similarity = normalized_similarity(artist, artist_search)
+        if average_similarity > 0.7:
+            #print(average_similarity,musica['title'], title_similarity, musica['artist'], artist_similarity)
 
-                        average_similarity = (title_similarity + artist_similarity + duration_similarity) / 3
-
-                        if average_similarity > 0.8:
-                            return path
-                except Exception as e:
-                    print(f"Error processing file {file}: {e}")
-
-    return None
+            if average_similarity > similarity_max:
+                similarity_max = average_similarity
+                path = musica['path']
+    
+    return path
 
 def update_line(line, new_path, output_directory):
     """Update a specific line in the playlist with the new path."""
@@ -122,7 +139,7 @@ def update_line(line, new_path, output_directory):
     return f"{line}{url_output_path}\n{url_new_path}\n{url_file_name}\n"
 
 
-def update_playlist(playlist_path, music_directory, output_directory):
+def update_playlist(playlist_path, musicas, output_directory):
     """Update playlist with new paths for music files."""
     try:
         with open(playlist_path, 'r') as file:
@@ -131,12 +148,12 @@ def update_playlist(playlist_path, music_directory, output_directory):
         print(f"Error opening playlist: {e}")
         return
 
-    for i, line in tqdm(enumerate(lines), total=len(lines)):
+    for i, line in lines:
         if line.startswith('#EXTINF:'):
             parsed_line = parse_playlist_line(line)
             if parsed_line:
                 duration, artist, title = parsed_line
-                new_path = find_music(music_directory, title, artist, duration)
+                new_path = find_music(musicas, title, artist, duration)
                 if new_path:
                     print(artist,title,new_path)
                     lines[i] = update_line(lines[i] , new_path, output_directory)
@@ -152,6 +169,7 @@ def update_playlist(playlist_path, music_directory, output_directory):
 # Example Usage
 music_directory = '/home/jadson/Músicas/sync/'
 output_directory = '/storage/emulated/0/Music/Sync/'
-playlist_path = './no pain, no gain .m3u'
+playlist_path = './Just Dance Unlimited - Todas as Músicas!_s.m3u'
 
-update_playlist(playlist_path, music_directory, output_directory)
+musicas = list_music(music_directory)
+update_playlist(playlist_path, musicas, output_directory)
