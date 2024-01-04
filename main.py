@@ -13,13 +13,6 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
 
-# audio = MP3('./01_Animals.mp3')
-# print(audio.pprint())
-# titulo = audio.get('TIT2')[0].replace(" ", "").replace('\n', "").lower()
-# artist = audio.get('TPE2')[0].replace(" ", "").replace('\n', "").lower()
-# tempo = int(audio.info.length)
-# print(artist, titulo, tempo)
-
 def normalized_similarity(s1, s2):
     """Calculate normalized similarity between two strings."""
     return textdistance.JaroWinkler(external=True).normalized_similarity(s1, s2)
@@ -102,8 +95,7 @@ def list_music(directory):
                         metadata = read_audio_metadata(path)
                         if metadata:
                             metadata['title'] = clean_string(metadata['title'])
-                            metadata['artist'] = clean_string(
-                                metadata['artist'])
+                            metadata['artist'] = clean_string(metadata['artist'])
                             metadata['path'] = path
                             musicas.append(metadata)
 
@@ -148,7 +140,7 @@ def update_playlist(playlist_path, musicas, output_directory):
         print(f"Error opening playlist: {e}")
         return
 
-    for i, line in lines:
+    for i, line in enumerate(lines):
         if line.startswith('#EXTINF:'):
             parsed_line = parse_playlist_line(line)
             if parsed_line:
@@ -169,7 +161,7 @@ def update_playlist(playlist_path, musicas, output_directory):
 # Example Usage
 music_directory = '/home/jadson/Músicas/sync/'
 output_directory = '/storage/emulated/0/Music/Sync/'
-playlist_path = './Just Dance Unlimited - Todas as Músicas!_s.m3u'
+playlist_path = './Just Dance (2009-2021).m3u'
 
 musicas = list_music(music_directory)
 update_playlist(playlist_path, musicas, output_directory)
